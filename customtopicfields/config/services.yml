@@ -1,0 +1,113 @@
+services:
+    reactiv.customtopicfields.listener:       # name of the service you want to register
+        class: reactiv\customtopicfields\event\main_listener
+        tags:
+            - { name: event.listener }
+
+    reactiv.customtopicfields.manager:
+        class: reactiv\customtopicfields\customfields\manager
+        arguments:
+            - @auth
+            - @dbal.conn
+            - @dispatcher
+            - @request
+            - @template
+            - @reactiv.customtopicfields.type_collection
+            - @user
+            - %tables.CUSTOM_FIELDS_%
+            - %tables.CUSTOM_FIELDS__language%
+            - %tables.CUSTOM_FIELDS__data%
+
+    reactiv.customtopicfields.lang_helper:
+        class: reactiv\customtopicfields\customfields\lang_helper
+        arguments:
+            - @dbal.conn
+            - %tables.CUSTOM_FIELDS__options_language%
+
+# ----- Custom fields types -----
+    reactiv.customtopicfields.type_collection:
+        class: phpbb\di\service_collection
+        arguments:
+            - @service_container
+        tags:
+            - { name: service_collection, tag: customfield.type }
+
+    reactiv.customtopicfields.type.bool:
+        class: reactiv\customtopicfields\customfields\type\type_bool
+        arguments:
+            - @reactiv.customtopicfields.lang_helper
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.date:
+        class: reactiv\customtopicfields\customfields\type\type_date
+        arguments:
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.dropdown:
+        class: reactiv\customtopicfields\customfields\type\type_dropdown
+        arguments:
+            - @reactiv.customtopicfields.lang_helper
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.googleplus:
+        class: reactiv\customtopicfields\customfields\type\type_googleplus
+        arguments:
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.int:
+        class: reactiv\customtopicfields\customfields\type\type_int
+        arguments:
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.string:
+        class: reactiv\customtopicfields\customfields\type\type_string
+        arguments:
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.text:
+        class: reactiv\customtopicfields\customfields\type\type_text
+        arguments:
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+    reactiv.customtopicfields.type.url:
+        class: reactiv\customtopicfields\customfields\type\type_url
+        arguments:
+            - @request
+            - @template
+            - @user
+        tags:
+            - { name: customfield.type }
+
+parameters:
+    tables.CUSTOM_FIELDS_: %core.table_prefix%cust_top_field
+    tables.CUSTOM_FIELDS__data: %core.table_prefix%cust_top_field_data
+    tables.CUSTOM_FIELDS__options_language: %core.table_prefix%cust_top_field_lang
+    tables.CUSTOM_FIELDS__language: %core.table_prefix%cust_top_lang
