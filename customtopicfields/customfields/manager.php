@@ -66,7 +66,7 @@ class manager
 
 	protected $fields_data_table;
 
-	protected $CUSTOM_cache = array();
+	protected $custom_cache = array();
 
 	/**
 	* Construct
@@ -101,29 +101,10 @@ class manager
 	* Assign editable fields to template, mode can be profile (for profile change) or register (for registration)
 	* Called by ucp_profile and ucp_register
 	*/
-	public function generate_CUSTOM_fields($mode, $lang_id)
+	public function generate_custom_fields($lang_id)
 	{
 		$sql_where = '';
-		switch ($mode)
-		{
-			case 'register':
-				// If the field is required we show it on the registration page
-				$sql_where .= ' AND f.field_show_on_reg = 1';
-			break;
-
-			case 'profile':
-				// Show hidden fields to moderators/admins
-				if (!$this->auth->acl_gets('a_', 'm_') && !$this->auth->acl_getf_global('m_'))
-				{
-					$sql_where .= ' AND f.field_show_topic = 1';
-				}
-			break;
-
-			default:
-				trigger_error('Wrong profile mode specified', E_USER_ERROR);
-			break;
-		}
-
+		print_r($lang_id);
 		$sql = 'SELECT l.*, f.*
 			FROM ' . $this->fields_language_table . ' l, ' . $this->fields_table . " f
 			WHERE f.field_active = 1
@@ -136,14 +117,14 @@ class manager
 		while ($row = $this->db->sql_fetchrow($result))
 		{
 			// Return templated field
-			$CUSTOM_field = $this->type_collection[$row['field_type']];
-			$tpl_snippet = $CUSTOM_field->process_field_row('change', $row);
+			$custom_field = $this->type_collection[$row['field_type']];
+			$tpl_snippet = $custom_field->process_field_row('change', $row);
 
-			$this->template->assign_block_vars('CUSTOM_fields', array(
+			$this->template->assign_block_vars('custom_fields', array(
 				'LANG_NAME'		=> $this->user->lang($row['lang_name']),
 				'LANG_EXPLAIN'	=> $this->user->lang($row['lang_explain']),
 				'FIELD'			=> $tpl_snippet,
-				'FIELD_ID'		=> $CUSTOM_field->get_field_ident($row),
+				'FIELD_ID'		=> $custom_field->get_field_ident($row),
 				'S_REQUIRED'	=> ($row['field_required']) ? true : false,
 			));
 		}
@@ -155,7 +136,7 @@ class manager
 	*/
 	protected function build_cache()
 	{
-		$this->CUSTOM_cache = array();
+		$this->custom_cache = array();
 
 		// Display hidden/no_view fields for admin/moderator
 		$sql = 'SELECT l.*, f.*
@@ -170,7 +151,7 @@ class manager
 
 		while ($row = $this->db->sql_fetchrow($result))
 		{
-			$this->CUSTOM_cache[$row['field_ident']] = $row;
+			$this->custom_cache[$row['field_ident']] = $row;
 		}
 		$this->db->sql_freeresult($result);
 	}
@@ -212,11 +193,11 @@ class manager
 
 		while ($row = $this->db->sql_fetchrow($result))
 		{
-			$CUSTOM_field = $this->type_collection[$row['field_type']];
-			$cp_data['pf_' . $row['field_ident']] = $CUSTOM_field->get_CUSTOM_field($row);
+			$custom_field = $this->type_collection[$row['field_type']];
+			$cp_data['pf_' . $row['field_ident']] = $custom_field->get_custom_field($row);
 			$check_value = $cp_data['pf_' . $row['field_ident']];
 
-			if (($cp_result = $CUSTOM_field->validate_CUSTOM_field($check_value, $row)) !== false)
+			if (($cp_result = $custom_field->validate_custom_field($check_value, $row)) !== false)
 			{
 				// If the result is not false, it's an error message
 				$cp_error[] = $cp_result;
@@ -228,7 +209,7 @@ class manager
 	/**
 	* Update profile field data directly
 	*/
-	public function update_CUSTOM_field_data($user_id, $cp_data)
+	public function update_custom_field_data($topic_id, $cp_data)
 	{
 		if (!sizeof($cp_data))
 		{
@@ -237,13 +218,13 @@ class manager
 
 		$sql = 'UPDATE ' . $this->fields_data_table . '
 			SET ' . $this->db->sql_build_array('UPDATE', $cp_data) . '
-			WHERE user_id = ' . (int) $user_id;
+			WHERE topic_id = ' . (int) $topic_id;
 		$this->db->sql_query($sql);
 
 		if (!$this->db->sql_affectedrows())
 		{
 			$cp_data = $this->build_insert_sql_array($cp_data);
-			$cp_data['user_id'] = (int) $user_id;
+			$cp_data['topic_id'] = (int) $topic_id;
 
 			$sql = 'INSERT INTO ' . $this->fields_data_table . ' ' . $this->db->sql_build_array('INSERT', $cp_data);
 			$this->db->sql_query($sql);
@@ -256,9 +237,9 @@ class manager
 	* @param string	$restrict_option	Restrict the published fields to a certain profile field option
 	* @return array		Returns an array with the template variables type, name and explain for the fields to display
 	*/
-	public function generate_CUSTOM_FIELDS_template_headlines($restrict_option = '')
+	public function generate_custom_fields_template_headlines($restrict_option = '')
 	{
-		if (!sizeof($this->CUSTOM_cache))
+		if (!sizeof($this->custom_cache))
 		{
 			$this->build_cache();
 		}
@@ -266,24 +247,24 @@ class manager
 		$tpl_fields = array();
 
 		// Go through the fields in correct order
-		foreach ($this->CUSTOM_cache as $field_ident => $field_data)
+		foreach ($this->custom_cache as $field_ident => $field_data)
 		{
 			if ($restrict_option && !$field_data[$restrict_option])
 			{
 				continue;
 			}
 
-			$CUSTOM_field = $this->type_collection[$field_data['field_type']];
+			$custom_field = $this->type_collection[$field_data['field_type']];
 
 			$tpl_fields[] = array(
 				'CUSTOM_FIELD_IDENT'	=> $field_ident,
 				'CUSTOM_FIELD_TYPE'	=> $field_data['field_type'],
-				'CUSTOM_FIELD_NAME'	=> $CUSTOM_field->get_field_name($field_data['lang_name']),
+				'CUSTOM_FIELD_NAME'	=> $custom_field->get_field_name($field_data['lang_name']),
 				'CUSTOM_FIELD_EXPLAIN'	=> $this->user->lang($field_data['lang_explain']),
 			);
 		}
 
-		$CUSTOM_cache = $this->CUSTOM_cache;
+		$custom_cache = $this->custom_cache;
 
 		/**
 		* Event to modify template headlines of the generated profile fields
@@ -291,16 +272,16 @@ class manager
 		* @event core.generate_CUSTOM_FIELDS_template_headlines
 		* @var	string	restrict_option	Restrict the published fields to a certain profile field option
 		* @var	array	tpl_fields		Array with template data fields
-		* @var	array	CUSTOM_cache	A copy of the profile cache to make additional checks
+		* @var	array	custom_cache	A copy of the profile cache to make additional checks
 		* @since 3.1.6-RC1
 		*/
 		$vars = array(
 			'restrict_option',
 			'tpl_fields',
-			'CUSTOM_cache',
+			'custom_cache',
 		);
 		extract($this->dispatcher->trigger_event('core.generate_CUSTOM_FIELDS_template_headlines', compact($vars)));
-		unset($CUSTOM_cache);
+		unset($custom_cache);
 
 		return $tpl_fields;
 	}
@@ -308,35 +289,35 @@ class manager
 	/**
 	* Grab the user specific profile fields data
 	*
-	* @param	int|array	$user_ids	Single user id or an array of ids
+	* @param	int|array	$topic_ids	Single user id or an array of ids
 	* @return array		Users profile fields data
 	*/
-	public function grab_CUSTOM_FIELDS_data($user_ids = 0)
+	public function grab_CUSTOM_FIELDS_data($topic_ids = 0)
 	{
-		if (!is_array($user_ids))
+		if (!is_array($topic_ids))
 		{
-			$user_ids = array($user_ids);
+			$topic_ids = array($topoic_ids);
 		}
 
-		if (!sizeof($this->CUSTOM_cache))
+		if (!sizeof($this->custom_cache))
 		{
 			$this->build_cache();
 		}
 
-		if (!sizeof($user_ids))
+		if (!sizeof($topic_ids))
 		{
 			return array();
 		}
 
 		$sql = 'SELECT *
 			FROM ' . $this->fields_data_table . '
-			WHERE ' . $this->db->sql_in_set('user_id', array_map('intval', $user_ids));
+			WHERE ' . $this->db->sql_in_set('topic_id', array_map('intval', $topic_ids));
 		$result = $this->db->sql_query($sql);
 
 		$field_data = array();
 		while ($row = $this->db->sql_fetchrow($result))
 		{
-			$field_data[$row['user_id']] = $row;
+			$field_data[$row['topic_id']] = $row;
 		}
 		$this->db->sql_freeresult($result);
 
@@ -348,26 +329,26 @@ class manager
 		* @var	array	field_data		Array with profile fields data
 		* @since 3.1.0-b3
 		*/
-		$vars = array('user_ids', 'field_data');
+		$vars = array('topic_ids', 'field_data');
 		extract($this->dispatcher->trigger_event('core.grab_CUSTOM_FIELDS_data', compact($vars)));
 
 		$user_fields = array();
 
 		// Go through the fields in correct order
-		foreach (array_keys($this->CUSTOM_cache) as $used_ident)
+		foreach (array_keys($this->custom_cache) as $used_ident)
 		{
-			foreach ($field_data as $user_id => $row)
+			foreach ($field_data as $topic_id => $row)
 			{
-				$user_fields[$user_id][$used_ident]['value'] = $row['pf_' . $used_ident];
-				$user_fields[$user_id][$used_ident]['data'] = $this->CUSTOM_cache[$used_ident];
+				$user_fields[$topic_id][$used_ident]['value'] = $row['pf_' . $used_ident];
+				$user_fields[$topic_id][$used_ident]['data'] = $this->custom_cache[$used_ident];
 			}
 
-			foreach ($user_ids as $user_id)
+			foreach ($topic_ids as $topic_id)
 			{
-				if (!isset($user_fields[$user_id][$used_ident]) && $this->CUSTOM_cache[$used_ident]['field_show_novalue'])
+				if (!isset($user_fields[$topic_id][$used_ident]) && $this->custom_cache[$used_ident]['field_show_novalue'])
 				{
-					$user_fields[$user_id][$used_ident]['value'] = '';
-					$user_fields[$user_id][$used_ident]['data'] = $this->CUSTOM_cache[$used_ident];
+					$user_fields[$topic_id][$used_ident]['value'] = '';
+					$user_fields[$topic_id][$used_ident]['data'] = $this->custom_cache[$used_ident];
 				}
 			}
 		}
@@ -383,12 +364,12 @@ class manager
 	*			This requires special treatments (links should not be parsed in the values, and more)
 	* @return array
 	*/
-	public function generate_CUSTOM_FIELDS_template_data($CUSTOM_row, $use_contact_fields = true)
+	public function generate_CUSTOM_FIELDS_template_data($CUSTOM_row)
 	{
 		// $CUSTOM_row == $user_fields[$row['user_id']];
 		$tpl_fields = array();
 		$tpl_fields['row'] = $tpl_fields['blockrow'] = array();
-
+print_r($tpl_fields);
 		/**
 		* Event to modify data of the generated profile fields, before the template assignment loop
 		*
@@ -398,36 +379,22 @@ class manager
 		* @var	bool	use_contact_fields	Should we display contact fields as such?
 		* @since 3.1.0-b3
 		*/
-		$vars = array('CUSTOM_row', 'tpl_fields', 'use_contact_fields');
+		$vars = array('CUSTOM_row', 'tpl_fields');
 		extract($this->dispatcher->trigger_event('core.generate_CUSTOM_FIELDS_template_data_before', compact($vars)));
 
+print_r($vars);
 		foreach ($CUSTOM_row as $ident => $ident_ary)
 		{
-			$CUSTOM_field = $this->type_collection[$ident_ary['data']['field_type']];
-			$value = $CUSTOM_field->get_CUSTOM_value($ident_ary['value'], $ident_ary['data']);
-			$value_raw = $CUSTOM_field->get_CUSTOM_value_raw($ident_ary['value'], $ident_ary['data']);
+			$custom_field = $this->type_collection[$ident_ary['data']['field_type']];
+			$value = $custom_field->get_CUSTOM_value($ident_ary['value'], $ident_ary['data']);
+			$value_raw = $custom_field->get_CUSTOM_value_raw($ident_ary['value'], $ident_ary['data']);
 
 			if ($value === null)
 			{
 				continue;
 			}
 
-			$field_desc = $contact_url = '';
-			if ($use_contact_fields && $ident_ary['data']['field_is_contact'])
-			{
-				$value = $CUSTOM_field->get_CUSTOM_contact_value($ident_ary['value'], $ident_ary['data']);
-				$field_desc = $this->user->lang($ident_ary['data']['field_contact_desc']);
-				if (strpos($field_desc, '%s') !== false)
-				{
-					$field_desc = sprintf($field_desc, $value);
-				}
-				$contact_url = '';
-				if (strpos($ident_ary['data']['field_contact_url'], '%s') !== false)
-				{
-					$contact_url = sprintf($ident_ary['data']['field_contact_url'], $value);
-				}
-			}
-
+			
 			$tpl_fields['row'] += array(
 				'CUSTOM_' . strtoupper($ident) . '_IDENT'		=> $ident,
 				'CUSTOM_' . strtoupper($ident) . '_VALUE'		=> $value,
@@ -492,8 +459,8 @@ class manager
 
 		while ($row = $this->db->sql_fetchrow($result))
 		{
-			$CUSTOM_field = $this->type_collection[$row['field_type']];
-			$cp_data['pf_' . $row['field_ident']] = $CUSTOM_field->get_default_field_value($row);
+			$custom_field = $this->type_collection[$row['field_type']];
+			$cp_data['pf_' . $row['field_ident']] = $custom_field->get_default_field_value($row);
 		}
 		$this->db->sql_freeresult($result);
 
